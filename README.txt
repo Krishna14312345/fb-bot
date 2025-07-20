@@ -1,13 +1,12 @@
-HOW TO USE - WHATSAPP GROUP UID FETCHER
-
-1. Install dependencies:
-   npm install
-
-2. Run script:
-   npm start
-
-3. Scan QR code in terminal using your WhatsApp.
-
-4. After login, your WhatsApp Group UIDs will be printed.
-
--- Tool by SONU ZONE --
+module.exports = {
+  apps: [{
+    name: 'sonu-bot',
+    script: 'index.js',
+    watch: true,
+    autorestart: true,
+    max_memory_restart: '300M',
+    env: {
+      NODE_ENV: 'production'
+    }
+  }]
+};
