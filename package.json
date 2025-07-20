@@ -1,12 +1,16 @@
 {
-  "name": "whatsapp-group-uid-fetcher",
+  "name": "sonu-wabot",
   "version": "1.0.0",
-  "main": "group-fetcher.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node group-fetcher.js"
+    "start": "node index.js"
   },
   "dependencies": {
-    "@hapi/boom": "^10.0.1",
-    "@whiskeysockets/baileys": "^6.6.0"
+    "@whiskeysockets/baileys": "^6.7.1",
+    "body-parser": "^1.20.2",
+    "ejs": "^3.1.9",
+    "express": "^4.19.2",
+    "multer": "^1.4.5",
+    "pino": "^8.17.0"
   }
 }
