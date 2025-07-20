@@ -1,0 +1,12 @@
+{
+  "name": "whatsapp-group-uid-fetcher",
+  "version": "1.0.0",
+  "main": "group-fetcher.js",
+  "scripts": {
+    "start": "node group-fetcher.js"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.6.0"
+  }
+}
