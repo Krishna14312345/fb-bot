@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SONU-WP-OFFLINE</title>
+  <style>
+    body {
+      background: url('https://i.gifer.com/7efs.gif') no-repeat center center fixed;
+      background-size: cover;
+      font-family: 'Orbitron', sans-serif;
+      color: #0ff;
+      padding: 30px;
+    }
+    input, select, button {
+      background: black;
+      color: #0ff;
+      border: 1px solid #0ff;
+      padding: 10px;
+      margin: 10px 0;
+      width: 100%;
+    }
+    .form-box {
+      background: rgba(0,0,0,0.7);
+      padding: 20px;
+      border: 2px solid #0ff;
+      border-radius: 10px;
+      max-width: 500px;
+      margin: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="form-box">
+    <h2>SONU-WP-OFFLINE</h2>
+    <form id="sendForm" enctype="multipart/form-data">
+      <label>WhatsApp Number or Group ID:</label>
+      <input type="text" name="target" placeholder="91XXXXXXXXXX@s.whatsapp.net" required>
+      
+      <label>Target Type:</label>
+      <select name="type">
+        <option value="inbox">Inbox</option>
+        <option value="group">Group</option>
+      </select>
+
+      <label>Delay per message (ms):</label>
+      <input type="number" name="delay" value="2000">
+
+      <label>Upload creds.json:</label>
+      <input type="file" name="creds" accept=".json" required>
+
+      <label>Upload sms.txt:</label>
+      <input type="file" name="sms" accept=".txt" required>
+
+      <button type="submit">Send Messages</button>
+    </form>
+    <div id="result"></div>
+  </div>
+
+  <script>
+    document.getElementById('sendForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const res = await fetch('/send', {
+        method: 'POST',
+        body: form
+      });
+      document.getElementById('result').innerText = await res.text();
+    }
+  </script>
+</body>
+</html>
