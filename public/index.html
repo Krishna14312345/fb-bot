@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ultimate Devil Bot</title>
+    <style>
+        body {
+            background: #111;
+            color: #0f0;
+            font-family: 'Orbitron', sans-serif;
+            padding: 20px;
+        }
+        textarea, input {
+            width: 100%;
+            padding: 8px;
+            margin-top: 10px;
+            background: #000;
+            color: #0f0;
+            border: 1px solid #0f0;
+        }
+        button {
+            background: #0f0;
+            color: #000;
+            font-weight: bold;
+            padding: 10px;
+            margin-top: 10px;
+            width: 100%;
+        }
+        #log {
+            height: 200px;
+            overflow-y: scroll;
+            background: #000;
+            margin-top: 20px;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔥 Ultimate Devil Bot 🔥</h1>
+    <form id="cookieForm">
+        <label>c_user:</label>
+        <input type="text" name="c_user" required>
+        <label>xs:</label>
+        <input type="text" name="xs" required>
+        <button type="submit">Upload Cookie</button>
+    </form>
+    <form id="abuseForm">
+        <label>Abuse Messages (1 per line):</label>
+        <textarea name="abuse" required></textarea>
+        <button type="submit">Upload Abuse</button>
+    </form>
+    <button onclick="sendWS('start')">Start Bot</button>
+    <button onclick="sendWS('stop')">Stop Bot</button>
+    <button onclick="sendWS('status')">Check Status</button>
+    <div id="log"></div>
+    <script>
+        const ws = new WebSocket(`ws://${location.host}`);
+        const log = document.getElementById('log');
+        ws.onmessage = e => log.innerHTML += '<div>' + e.data + '</div>';
+
+        function sendWS(msg) {
+            ws.send(msg);
+        }
+
+        document.getElementById('cookieForm').onsubmit = e => {
+            e.preventDefault();
+            const data = Object.fromEntries(new FormData(e.target).entries());
+            fetch('/upload-cookie', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }).then(res => res.text()).then(msg => alert(msg));
+        };
+
+        document.getElementById('abuseForm').onsubmit = e => {
+            e.preventDefault();
+            const abuse = e.target.abuse.value;
+            fetch('/upload-abuse', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ abuse })
+            }).then(res => res.text()).then(msg => alert(msg));
+        };
+    </script>
+</body>
+</html>
