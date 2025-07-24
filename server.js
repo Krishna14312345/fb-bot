@@ -1,80 +1,84 @@
-require('dotenv').config();
+const express = require('express');
 const fs = require('fs');
+const path = require('path');
 const WebSocket = require('ws');
+const bodyParser = require('body-parser');
+const { spawn } = require('child_process');
+const { login } = require('facebook-chat-api');
 
-const wss = new WebSocket.Server({ port: process.env.PORT || 8080 });
-let bot = { running: false, cookie: null, prefix: '!', adminId: null, abuseMessages: [], settings: {} };
+const app = express();
+const wss = new WebSocket.Server({ noServer: true });
 
-function broadcast(data) {
-  wss.clients.forEach(ws => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify(data)));
+let api = null;
+let wsClient = null;
+let abuseMessages = [];
+let isRunning = false;
+let cookieData = null;
+
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve HTML
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/index.html'));
+});
+
+// Upload cookie
+app.post('/upload-cookie', (req, res) => {
+    cookieData = req.body;
+    res.send('Cookie uploaded.');
+});
+
+// Upload abuse messages
+app.post('/upload-abuse', (req, res) => {
+    abuseMessages = req.body.abuse.split('\n');
+    res.send('Abuse messages uploaded.');
+});
+
+// WebSocket upgrade
+const server = app.listen(21165, () => console.log('Ultimate Devil Bot running on port 21165'));
+server.on('upgrade', (req, socket, head) => {
+    wss.handleUpgrade(req, socket, head, socket => {
+        wsClient = socket;
+        socket.on('message', msg => handleWSCommand(msg));
+    });
+});
+
+function handleWSCommand(msg) {
+    if (msg === 'start') return startBot();
+    if (msg === 'stop') return stopBot();
+    if (msg === 'status') return wsClient.send(isRunning ? 'Bot is running' : 'Bot is stopped');
 }
 
-function log(msg) {
-  broadcast({ type: 'log', message: msg });
-  console.log(msg);
-}
+function startBot() {
+    if (isRunning || !cookieData) return;
+    isRunning = true;
+    login({ userID: cookieData.c_user, access_token: cookieData.xs }, { forceLogin: true }, (err, _api) => {
+        if (err) {
+            wsClient.send('Login failed: ' + err.error || err);
+            isRunning = false;
+            return;
+        }
+        api = _api;
+        wsClient.send('Bot started.');
 
-function updateStatus() {
-  broadcast({ type: 'status', running: bot.running });
-}
-
-function updateSettings() {
-  broadcast({ type: 'settings', ...bot.settings });
-}
-
-async function startBot() {
-  bot.running = true;
-  updateStatus();
-  log('Bot started ✨');
-  bot.timer = setInterval(() => {
-    log(\`BOT> [\${bot.prefix}] Checking inbox...\`);
-    if (bot.abuseMessages.length) {
-      log('BOT> Sending abuse message: ' + bot.abuseMessages[Math.floor(Math.random() * bot.abuseMessages.length)]);
-    }
-  }, 5000);
+        api.listenMqtt((err, message) => {
+            if (err || !isRunning) return;
+            if (message.body && abuseMessages.length > 0) {
+                const reply = abuseMessages[Math.floor(Math.random() * abuseMessages.length)];
+                api.sendMessage(reply, message.threadID);
+                wsClient.send(`Replied with abuse: "${reply}" to thread ${message.threadID}`);
+            }
+        });
+    });
 }
 
 function stopBot() {
-  clearInterval(bot.timer);
-  bot.running = false;
-  updateStatus();
-  log('Bot stopped 🔴');
+    if (!isRunning || !api) return;
+    isRunning = false;
+    api.logout(err => {
+        if (err) wsClient.send('Logout failed.');
+        else wsClient.send('Bot stopped.');
+    });
 }
-
-wss.on('connection', ws => {
-  log('Client connected');
-  updateStatus();
-  updateSettings();
-
-  ws.on('message', msg => {
-    let data = JSON.parse(msg);
-    switch (data.type) {
-      case 'start':
-        bot.cookie = data.cookieContent;
-        bot.prefix = data.prefix;
-        bot.adminId = data.adminId;
-        log('Cookie, prefix and admin ID received.');
-        startBot();
-        break;
-      case 'stop':
-        stopBot();
-        break;
-      case 'uploadAbuse':
-        bot.abuseMessages = data.content.split(/\r?\n/).filter(l => l.trim());
-        log(\`Abuse messages loaded: \${bot.abuseMessages.length}\`);
-        break;
-      case 'saveSettings':
-        bot.settings.autoSpamAccept = data.autoSpamAccept;
-        bot.settings.autoMessageAccept = data.autoMessageAccept;
-        log(\`Settings saved: autoSpam=\${bot.settings.autoSpamAccept}, autoMsg=\${bot.settings.autoMessageAccept}\`);
-        updateSettings();
-        break;
-      default:
-        log(\`Unknown command: \${data.type}\`);
-    }
-  });
-
-  ws.on('close', () => log('Client disconnected'));
-});
-
-log(\`WebSocket server running on port \${process.env.PORT || 8080}\`);
