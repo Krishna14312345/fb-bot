@@ -1,67 +1,77 @@
 const express = require('express');
-const { Boom } = require('@hapi/boom');
-const makeWASocket = require('@whiskeysockets/baileys').default;
-const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
-const multer = require('multer');
-const fs = require('fs');
+const { WebSocketServer } = require('ws');
+const fs = require('fs-extra');
+const http = require('http');
 const path = require('path');
 
 const app = express();
-const port = 3000;
+const PORT = 6969;
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
 
-const upload = multer({ dest: 'uploads/' });
+let running = false;
+let settings = {
+  autoSpamAccept: false,
+  autoMessageAccept: false,
+  autoConvo: false
+};
+
+// Serve HTML
 app.use(express.static('public'));
-app.use(express.json());
 
-let sock;
-let sessionPath = 'auth';
+wss.on('connection', (ws) => {
+  console.log("🔌 New WebSocket connection");
+  ws.send(JSON.stringify({ type: 'status', running }));
+  ws.send(JSON.stringify({ type: 'settings', ...settings }));
 
-async function startSock() {
-  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
-  sock = makeWASocket({
-    auth: state,
-    printQRInTerminal: true,
-  });
+  ws.on('message', async (message) => {
+    try {
+      const data = JSON.parse(message);
+      switch (data.type) {
+        case 'start':
+          await fs.outputFile('./uploads/cookie.txt', data.cookieContent);
+          settings.prefix = data.prefix || '!';
+          settings.adminId = data.adminId || '';
+          running = true;
+          ws.send(JSON.stringify({ type: 'status', running }));
+          sendLog(ws, '✅ Bot started');
+          break;
 
-  sock.ev.on('creds.update', saveCreds);
-  sock.ev.on('connection.update', ({ connection, lastDisconnect }) => {
-    if (connection === 'close') {
-      const shouldReconnect = (lastDisconnect.error = Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-      if (shouldReconnect) {
-        startSock();
+        case 'stop':
+          running = false;
+          ws.send(JSON.stringify({ type: 'status', running }));
+          sendLog(ws, '⛔ Bot stopped');
+          break;
+
+        case 'uploadAbuse':
+          await fs.outputFile('./uploads/abuse.txt', data.content);
+          sendLog(ws, '📁 Abuse file uploaded');
+          break;
+
+        case 'saveWelcome':
+          await fs.outputFile('./welcome.txt', data.content);
+          sendLog(ws, '💬 Welcome messages saved');
+          break;
+
+        case 'saveSettings':
+          settings.autoSpamAccept = data.autoSpamAccept;
+          settings.autoMessageAccept = data.autoMessageAccept;
+          settings.autoConvo = data.autoConvo;
+          await fs.outputJson('./settings.json', settings, { spaces: 2 });
+          sendLog(ws, '⚙️ Settings saved');
+          break;
       }
-    } else if (connection === 'open') {
-      console.log('✅ Connected to WhatsApp');
+    } catch (e) {
+      sendLog(ws, '❌ Error: ' + e.message);
     }
   });
-}
-
-startSock();
-
-app.post('/send', upload.fields([
-  { name: 'creds', maxCount: 1 },
-  { name: 'sms', maxCount: 1 }
-]), async (req, res) => {
-  try {
-    const target = req.body.target;
-    const delay = parseInt(req.body.delay) || 2000;
-    const isGroup = req.body.type === 'group';
-
-    const messageLines = fs.readFileSync(req.files['sms'][0].path, 'utf-8').split('\n').filter(Boolean);
-
-    for (let msg of messageLines) {
-      await sock.sendMessage(target, { text: msg });
-      console.log('Sent:', msg);
-      await new Promise(r => setTimeout(r, delay));
-    }
-
-    res.send('📤 Messages sent successfully!');
-  } catch (err) {
-    console.error('❌ Error sending messages:', err);
-    res.status(500).send('Internal error');
-  }
 });
 
-app.listen(port, () => {
-  console.log(`🚀 Server running at http://localhost:${port}`);
+function sendLog(ws, msg) {
+  ws.send(JSON.stringify({ type: 'log', message: msg }));
+}
+
+// Start server
+server.listen(PORT, () => {
+  console.log(`🚀 Server started on http://localhost:${PORT}`);
 });
