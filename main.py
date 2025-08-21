@@ -4,7 +4,7 @@ import logging
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 import requests
-from typing import Dict, List
+from typing import List
 from pathlib import Path
 
 # Logging setup for better debugging
@@ -21,6 +21,7 @@ bot_settings = {
     "admin_id": "",
     "running": False
 }
+
 abuse_messages: List[str] = []
 
 # File paths for persistent storage
@@ -84,10 +85,7 @@ class FacebookBot:
         self.running = False
 
     def start(self):
-        # Placeholder: Add Facebook login logic here
-        # Example: Make API call to verify cookie
         try:
-            # Test cookie validity (replace with actual Facebook API endpoint)
             response = self.session.get("https://graph.facebook.com/me")
             if response.status_code == 200:
                 self.running = True
@@ -105,7 +103,6 @@ class FacebookBot:
         logger.info("Bot stopped")
 
     def handle_command(self, message: str, sender_id: str, group_id: str) -> str:
-        # Example command handling
         if not message.startswith(self.prefix):
             return None
         command = message[len(self.prefix):].strip().split()
@@ -118,12 +115,11 @@ class FacebookBot:
         if cmd == "help":
             return "Available commands: !help, !uid, !tid, !info, !antiout on/off, etc."
         elif cmd == "uid":
-            if args and args[0].startswith("@"):
-                return f"User ID: {args[0][1:]} (Placeholder)"
+            if args and args.startswith("@"):
+                return f"User ID: {args[1:]} (Placeholder)"
             return f"Your ID: {sender_id}"
         elif cmd == "tid":
             return f"Group ID: {group_id}"
-        # Add more commands here (e.g., !antiout, !pair, !music)
         return None
 
 # Global bot instance
@@ -170,8 +166,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 bot_settings["prefix"] = prefix
                 bot_settings["admin_id"] = admin_id
+
                 bot_instance = FacebookBot(cookie, prefix, admin_id)
-                
+
                 if bot_instance.start():
                     bot_settings["running"] = True
                     await websocket.send_text(json.dumps({"type": "log", "message": f"Bot started with prefix: {prefix}"}))
@@ -202,10 +199,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_text(json.dumps({"type": "log", "message": "Settings saved"}))
                 await websocket.send_text(json.dumps({"type": "settings", **bot_settings}))
 
-            # Simulate bot logs (replace with real bot events)
             if bot_settings["running"]:
-                # Example: Send periodic logs
-                # await websocket.send_text(json.dumps({"type": "log", "message": "Bot is running..."}))
+                # Example: Send periodic bot logs here if needed
                 pass
 
     except WebSocketDisconnect:
@@ -213,3 +208,9 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         await websocket.send_text(json.dumps({"type": "log", "message": f"Server error: {str(e)}"}))
+
+# --- Uvicorn server start for Render.com ---
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
